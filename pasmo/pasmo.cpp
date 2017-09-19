@@ -13,8 +13,6 @@ using std::cout;
 using std::cerr;
 using std::endl;
 
-#define VERSION "0.5.4.beta2"
-
 namespace {
 
 
@@ -22,7 +20,7 @@ using std::string;
 using std::vector;
 using std::runtime_error;
 
-const string pasmoversion (VERSION);
+const string pasmoversion ("0.5.4.beta2");
 
 
 class Usage { };
@@ -80,6 +78,7 @@ const string opttapbas    ("--tapbas");
 const string opttzx       ("--tzx");
 const string opttzxbas    ("--tzxbas");
 const string optw8080     ("--w8080");
+const string optsna       ("--sna");
 
 
 class Options {
@@ -172,6 +171,8 @@ Options::Options (int argc, char * * argv) :
 			emitfunc= & Asm::emitamsdos;
 		else if (arg == optmsx)
 			emitfunc= & Asm::emitmsx;
+		else if (arg == optsna)
+			emitfunc= & Asm::emitsna;
 		else if (arg == optpublic)
 			emitpublic= true;
 		else if (arg == optname)

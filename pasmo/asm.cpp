@@ -71,6 +71,7 @@ logic_error MACROLostENDM ("Unexpected MACRO without ENDM");
 
 runtime_error ErrorReadingINCBIN ("Error reading INCBIN file");
 runtime_error ErrorOutput ("Error writing object file");
+runtime_error ErrorSNAOutput("Error writing object file; No start address defined. Use END to set address.");
 
 runtime_error InvalidPredefine ("Can't predefine invalid identifier");
 runtime_error InvalidPredefineValue ("Invalid value for predefined symbol");
@@ -922,6 +923,8 @@ public:
 
 	void emittapbas (std::ostream & out);
 	void emittzxbas (std::ostream & out);
+
+	void emitsna(std::ostream & out);
 
 	void emithex (std::ostream & out);
 	void emitamsdos (std::ostream & out);
@@ -6388,6 +6391,88 @@ void Asm::In::writecdtcode (std::ostream & out)
 		throw ErrorOutput;
 }
 
+void Asm::In::emitsna(std::ostream & out)
+{
+	message_emit("SNA");
+	unsigned int stackTop = 0xFFFC;
+
+	// write header
+	out.put(0); // I
+	out.put(0); // L'
+	out.put(0); // H'
+	out.put(0); // E'
+	out.put(0); // D'
+	out.put(0); // C'
+	out.put(0); // B'
+	out.put(0); // F'
+	out.put(0); // A'
+	out.put(0); // L
+	out.put(0); // H
+	out.put(0); // E
+	out.put(0); // D
+	out.put(0); // C
+	out.put(0); // B
+	out.put(0); // IYl
+	out.put(0); // IYh
+	out.put(0); // IXl
+	out.put(0); // IXh
+	out.put(4); // IFF2
+	out.put(0); // R
+	out.put(0); // F
+	out.put(0); // A
+	out.put(lobyte(stackTop)); // SP
+	out.put(hibyte(stackTop)); // SP
+	out.put(0); // IM
+	out.put(7); // Border Color
+
+	// clear screen bitmap
+	for (int i = 16384; i < 22528; ++i)
+	{
+		out.put(0);
+	}
+
+	// write attributes, default black ink on white paper
+	for (int i = 22528; i < 23296; ++i)
+	{
+		out.put(7);
+	}
+
+	// clear memory from 23296 to minused (our code)
+	for (int i = 23296; i < minused; ++i)
+	{
+		out.put(0);
+	}
+
+	// write out binary
+	for (int i = minused; i <= maxused; ++i)
+	{
+		out.put(mem[i]);
+	}
+
+	// write clear memory from maxused to start of stack
+	for (unsigned int i = maxused + 1; i < stackTop; ++i)
+	{
+		out.put(0);
+	}
+
+	// start program start address
+	if (hasentrypoint)
+	{
+		// put start address of program on stack
+		out.put(lobyte(entrypoint));
+		out.put(hibyte(entrypoint));
+
+		// put the reset spectrum (0) address on stack if user exits program
+		out.put(0);
+		out.put(0);
+	}
+	else
+	{
+		// must have a start address
+		throw ErrorSNAOutput;
+	}
+}
+
 void Asm::In::emitcdt (std::ostream & out)
 {
 	message_emit ("CDT");
@@ -6965,6 +7050,11 @@ void Asm::emitcmd (std::ostream & out)
 void Asm::emitmsx (std::ostream & out)
 {
 	pin->emitmsx (out);
+}
+
+void Asm::emitsna(std::ostream & out)
+{
+	pin->emitsna(out);
 }
 
 void Asm::dumppublic (std::ostream & out)

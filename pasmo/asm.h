@@ -49,6 +49,8 @@ public:
 	void emittzxbas (std::ostream & out);
 	void emitcdtbas (std::ostream & out);
 
+	void emitsna(std::ostream & out);
+
 	void emithex (std::ostream & out);
 	void emitamsdos (std::ostream & out);
 
