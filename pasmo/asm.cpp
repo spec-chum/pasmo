@@ -1157,7 +1157,7 @@ private:
 	bool mode86;
 	DebugType debugtype;
 
-	byte mem [65536];
+	byte mem[65536]{};
 	address base;
 	address current;
 	address currentinstruction;
@@ -4404,7 +4404,7 @@ void Asm::In::parseSUBDEHL (Tokenizer & tz)
 
 void Asm::In::parseADDBCDE (Tokenizer & tz, byte prefix, byte basecode)
 {
-	ASSERT ((basecode == codeADDBC || basecode == codeADDDE) && prefix == prefixEd);
+	ASSERT ((basecode == codeADDBC || basecode == codeADDDE) && prefix == prefixED);
 
 	expectcomma (tz);
 	Token tok= tz.gettoken ();
@@ -6420,7 +6420,7 @@ void Asm::In::emitsna(std::ostream & out)
 	// make room on stack for PC
 	stacktop -= 2;
 
-	// write header
+	// write header, keep discrete for now
 	out.put(0); // I
 	out.put(0); // L'
 	out.put(0); // H'
@@ -6449,41 +6449,22 @@ void Asm::In::emitsna(std::ostream & out)
 	out.put(1); // IM
 	out.put(7); // Border Color
 
-	// offset 16384 - .sna header
-	const int offset = 16384 - 27;
+	// set PAPER 7 INK 0
+	std::memset(mem + 22528, 7 << 3, 768);
 
-	// clear all memory up to 65536
-	for (int i = 16384; i < 65536; ++i)
-	{
-		out.put(0);
-	}
-
-	// write attributes, default black ink on white paper
-	out.seekp(22528 - offset, std::ios::beg);
-	for (int i = 22528; i < 23296; ++i)
-	{
-		out.put(7 << 3);
-	}
-
-	// write out binary
-	out.seekp(minused-offset, std::ios::beg);
-	for (int i = minused; i <= maxused; ++i)
-	{
-		out.put(mem[i]);
-	}
-
-	// put PC on stack
-	out.seekp(stacktop-offset, std::ios::beg);
+	// put entry point on stack or throw error if there isn't one
 	if (hasentrypoint)
 	{
-		out.put(lobyte(entrypoint));
-		out.put(hibyte(entrypoint));
+		mem[stacktop	] = lobyte(entrypoint);
+		mem[stacktop + 1] = hibyte(entrypoint);
 	}
 	else
 	{
-		// must have a start address
 		throw ErrorSNAOutput;
 	}
+
+	// write 48K RAM
+	out.write(reinterpret_cast<char *>(mem + 16384), 49152);
 }
 
 void Asm::In::emitcdt (std::ostream & out)
