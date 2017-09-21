@@ -204,6 +204,7 @@ enum TypeToken {
 	TypeEQU,
 	TypeDEFL,
 	TypeORG,
+	TypeSTACK,
 	TypeINCLUDE,
 	TypeINCBIN,
 	TypeIF,

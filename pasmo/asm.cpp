@@ -63,6 +63,7 @@ logic_error LocalNotExpected ("Unexpected local block encountered");
 logic_error AutoLocalNotExpected ("Unexpected autolocal block encountered");
 logic_error InvalidPassValue ("Invalid value of pass");
 logic_error UnexpectedORG ("Unexpected ORG found");
+logic_error UnexpectedSTACK("Unexpected STACK found");
 logic_error UnexpectedMACRO ("Unexpected MACRO found");
 logic_error MACROLostENDM ("Unexpected MACRO without ENDM");
 
@@ -1014,6 +1015,8 @@ private:
 
 	void parseORG (Tokenizer & tz,
 		const std::string & label= std::string () );
+	void parseSTACK(Tokenizer & tz,
+		const std::string & label = std::string());
 	void parseEQU (Tokenizer & tz, const std::string & label);
 	void parseDEFL (Tokenizer & tz, const std::string & label);
 
@@ -1161,6 +1164,7 @@ private:
 	address minused;
 	address maxused;
 	address entrypoint;
+	address stacktop;
 	bool hasentrypoint;
 	int pass;
 	int lastpass;
@@ -1358,6 +1362,7 @@ Asm::In::In () :
 	debugtype (NoDebug),
 	base (0),
 	current (0),
+	stacktop (65534),
 	currentinstruction (0),
 	minused (65535),
 	maxused (0),
@@ -2325,6 +2330,9 @@ void Asm::In::parseline (Tokenizer & tz)
 	case TypeORG:
 		parseORG (tz);
 		break;
+	case TypeSTACK:
+		parseSTACK(tz);
+		break;
 	case TypeEQU:
 		throw EQUwithoutlabel;
 	case TypeDEFL:
@@ -2793,6 +2801,20 @@ void Asm::In::parseORG (Tokenizer & tz, const std::string & label)
 
 	if (! label.empty () )
 		setlabel (label);
+}
+
+void Asm::In::parseSTACK(Tokenizer & tz, const std::string & label)
+{
+	TRF;
+
+	Token tok = tz.gettoken();
+	address stack = parseexpr(true, tok, tz);
+	stacktop = stack;
+
+	*pout << "\t\tSTACK " << hex4(stack) << endl;
+
+	if (!label.empty())
+		setlabel(label);
 }
 
 void Asm::In::parseEQU (Tokenizer & tz, const std::string & label)
@@ -6394,7 +6416,9 @@ void Asm::In::writecdtcode (std::ostream & out)
 void Asm::In::emitsna(std::ostream & out)
 {
 	message_emit("SNA");
-	unsigned int stackTop = 0xFFFC;
+	
+	// make room on stack for PC
+	stacktop -= 2;
 
 	// write header
 	out.put(0); // I
@@ -6420,51 +6444,40 @@ void Asm::In::emitsna(std::ostream & out)
 	out.put(0); // R
 	out.put(0); // F
 	out.put(0); // A
-	out.put(lobyte(stackTop)); // SP
-	out.put(hibyte(stackTop)); // SP
-	out.put(0); // IM
+	out.put(lobyte(stacktop)); // SP
+	out.put(hibyte(stacktop)); // SP
+	out.put(1); // IM
 	out.put(7); // Border Color
 
-	// clear screen bitmap
-	for (int i = 16384; i < 22528; ++i)
+	// offset 16384 - .sna header
+	const int offset = 16384 - 27;
+
+	// clear all memory up to 65536
+	for (int i = 16384; i < 65536; ++i)
 	{
 		out.put(0);
 	}
 
 	// write attributes, default black ink on white paper
+	out.seekp(22528 - offset, std::ios::beg);
 	for (int i = 22528; i < 23296; ++i)
 	{
-		out.put(7);
-	}
-
-	// clear memory from 23296 to minused (our code)
-	for (int i = 23296; i < minused; ++i)
-	{
-		out.put(0);
+		out.put(7 << 3);
 	}
 
 	// write out binary
+	out.seekp(minused-offset, std::ios::beg);
 	for (int i = minused; i <= maxused; ++i)
 	{
 		out.put(mem[i]);
 	}
 
-	// write clear memory from maxused to start of stack
-	for (unsigned int i = maxused + 1; i < stackTop; ++i)
-	{
-		out.put(0);
-	}
-
-	// start program start address
+	// put PC on stack
+	out.seekp(stacktop-offset, std::ios::beg);
 	if (hasentrypoint)
 	{
-		// put start address of program on stack
 		out.put(lobyte(entrypoint));
 		out.put(hibyte(entrypoint));
-
-		// put the reset spectrum (0) address on stack if user exits program
-		out.put(0);
-		out.put(0);
 	}
 	else
 	{

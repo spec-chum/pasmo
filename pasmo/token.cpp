@@ -222,6 +222,7 @@ const NameType nt []= {
 	NT (EQU),
 	NT (DEFL),
 	NT (ORG),
+	NT (STACK),
 	NT (INCLUDE),
 	NT (INCBIN),
 	NT (IF),
